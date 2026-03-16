@@ -64,7 +64,8 @@ jobs:
       - id: first-image-tag
         name: select first image tag
         run: |
-          tag="${${{ steps.docker_meta_img.outputs.tags }}%%,*}"
+          tags="${{ steps.docker_meta_img.outputs.tags }}"
+          tag="${tags%%,*}"
           echo "repository=$tag" >> $GITHUB_OUTPUT
 
       - name: Log into ghcr.io
