@@ -61,6 +61,12 @@ jobs:
           tags: |
             type=ref,event=branch,priority=601
 
+      - id: first-image-tag
+        name: select first image tag
+        run: |
+          tag="${${{ steps.docker_meta_img.outputs.tags }}%%,*}"
+          echo "repository=$tag" >> $GITHUB_OUTPUT
+
       - name: Log into ghcr.io
         uses: docker/login-action@v3
         with:
@@ -77,14 +83,12 @@ jobs:
           load: true
           tags: ${{ steps.docker_meta_img.outputs.tags }}
           labels: ${{ steps.docker_meta_img.outputs.labels }}
-          build-args: |
-            KEYCLOAK_VARIANT=${{ matrix.variant }}
 
       - name: Export Docker image as tar
         run: |
           mkdir -p ${{ github.workspace }}/clamavscan/container_fs
           chmod -R 777 ${{ github.workspace }}/clamavscan
-          docker create --name temp_scan_container ghcr.io/${{ steps.lower-repo.outputs.repository }}:${{ needs.branch_meta.outputs.sha }}
+          docker create --name temp_scan_container ${{ steps.first-image-tag.outputs.tag }}
           docker export temp_scan_container | tar -xf - -C ${{ github.workspace }}/clamavscan/container_fs
           docker rm temp_scan_container
 
@@ -94,8 +98,8 @@ jobs:
 
       - name: create logfile
         run: |
-          touch ${{ github.workspace }}/clamav-results-${{ matrix.variant }}.txt
-          chmod ugo+rw ${{ github.workspace }}/clamav-results-${{ matrix.variant }}.txt
+          touch ${{ github.workspace }}/clamav-results.txt
+          chmod ugo+rw ${{ github.workspace }}/clamav-results.txt
 
       - name: Run ClamAV Update
         run: |
@@ -107,22 +111,22 @@ jobs:
 
       - name: Run ClamAV SCAN
         run: |
-          docker run --rm -v ${{ github.workspace }}:/workdir -v ${{ github.workspace }}/clamavscan:/scan -v sockets:/tmp clamav/clamav:latest clamdscan /scan/container_fs -m -w --fdpass -l /workdir/clamav-results-${{ matrix.variant }}.txt -v --stdout
+          docker run --rm -v ${{ github.workspace }}:/workdir -v ${{ github.workspace }}/clamavscan:/scan -v sockets:/tmp clamav/clamav:latest clamdscan /scan/container_fs -m -w --fdpass -l /workdir/clamav-results.txt -v --stdout
 
       - name: Upload ClamAV scan results
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: clamav-results-${{ matrix.variant }}
-          path: clamav-results-${{ matrix.variant }}.txt
+          name: clamav-results
+          path: clamav-results.txt
 
       - name: Check ClamAV scan result
         run: |
-          if grep -q "Infected files: 0" ${{ github.workspace }}/clamav-results-${{ matrix.variant }}.txt; then
-            echo "No malware found for variant ${{ matrix.variant }}."
+          if grep -q "Infected files: 0" ${{ github.workspace }}/clamav-results.txt; then
+            echo "No malware found."
           else
-            echo "::warning::Malware detected or scan failed for variant ${{ matrix.variant }}!"
-            cat ${{ github.workspace }}/clamav-results-${{ matrix.variant }}.txt
+            echo "::warning::Malware detected or scan failed!"
+            cat ${{ github.workspace }}/clamav-results.txt
             exit 1
           fi
 
@@ -137,7 +141,7 @@ jobs:
       - name: run trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.33.1
         with:
-          image-ref: ghcr.io/${{ steps.lower-repo.outputs.repository }}:${{ needs.branch_meta.outputs.sha }}
+          image-ref: ${{ steps.first-image-tag.outputs.tag }}
           format: "sarif"
           output: "trivy-results.sarif"
           severity: "CRITICAL,HIGH"
@@ -156,7 +160,7 @@ jobs:
       - name: run trivy vulnerability scanner to generate SBOM
         uses: aquasecurity/trivy-action@0.33.1
         with:
-          image-ref: ghcr.io/${{ steps.lower-repo.outputs.repository }}:${{ needs.branch_meta.outputs.sha }}
+          image-ref: ${{ steps.first-image-tag.outputs.tag }}
           format: "github"
           output: "dependency-results.sbom.json"
           scan-type: 'image'
