@@ -61,8 +61,8 @@ jobs:
           tags: |
             type=ref,event=branch,priority=601
 
-      - id: first-image-tag
-        name: select first image tag
+      - id: extract-first-image-tag
+        name: Extract first image tag
         run: |
           tags="${{ steps.docker_meta_img.outputs.tags }}"
           tag="${tags%%,*}"
