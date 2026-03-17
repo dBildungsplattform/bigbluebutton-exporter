@@ -2,7 +2,7 @@ DOCS_BUILD_DIR=./html
 
 .PHONY: docker
 docker:
-	bash build-docker.sh
+	docker built -t bigbluebutton-exporter-dev:latest .
 
 .PHONY: docs
 docs:

@@ -1,0 +1,122 @@
+name: Semantic Release
+
+on:
+  push:
+    branches:
+      - 'master'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to be able to publish a GitHub release
+      issues: write # to be able to comment on released issues
+      pull-requests: write # to be able to comment on released pull requests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: >
+          npm install -g
+          semantic-release
+          @semantic-release/commit-analyzer
+          @semantic-release/release-notes-generator
+          @semantic-release/git
+          @semantic-release/github
+      - name: Run Semantic-Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+
+  get_tag:
+    runs-on: ubuntu-latest
+    needs: release
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.get_tag.outputs.tag }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - id: get_tag
+        run: |
+         tag=$(git describe --tags)
+         echo "tag=$tag" >> $GITHUB_OUTPUT
+
+  build_and_upload_image:
+    name: Publish image
+    needs:
+      - get_tag
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.get_tag.outputs.tag }}
+          fetch-tags: true
+      - name: Build image name and tags
+        id: docker_meta_img
+        uses: docker/metadata-action@v5.7.0
+        with:
+          context: git
+          images: |
+            name=ghcr.io/${{ github.repository }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.get_tag.outputs.tag }}
+          tags: |
+            type=raw,value=${{ needs.get_tag.outputs.tag }}
+            type=raw,value=latest
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: repo-to-lowercase
+        name: Convert repository to lowercase
+        run: |
+          repo_var=${{ github.repository }}
+          echo "repository=${repo_var@L}" >> $GITHUB_OUTPUT
+      - name: Build and push image to ghcr
+        id: docker_build_push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          pull: true
+          tags: ${{ steps.docker_meta_img.outputs.tags }}
+          labels: ${{ steps.docker_meta_img.outputs.labels }}
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: ghcr.io/${{ steps.repo-to-lowercase.outputs.repository }}@${{ steps.docker_build_push.outputs.digest }}
+          format: "sarif"
+          output: "trivy-results.sarif"
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+          scan-type: 'image'
+        env:
+          TRIVY_SKIP_DB_UPDATE: false
+          TRIVY_SKIP_JAVA_DB_UPDATE: false
+      - name: Upload Trivy results
+        if: ${{ always() }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-results.sarif"
