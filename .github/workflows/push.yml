@@ -157,7 +157,7 @@ jobs:
         with:
           sarif_file: "trivy-results.sarif"
 
-      - name: run trivy vulnerability scanner to generate SBOM
+      - name: Run Trivy vulnerability scanner to generate SBOM
         uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: ${{ steps.first-image-tag.outputs.tag }}
