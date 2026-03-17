@@ -106,7 +106,7 @@ jobs:
         run: |
           docker run --rm -v ${{ github.workspace }}/clamavscan:/scan clamav/clamav:latest freshclam --datadir=/scan
 
-      - name: Run ClamAV start Deamon
+      - name: Run ClamAV start Daemon
         run: |
           docker run  --rm -v ${{ github.workspace }}/clamavscan:/scan -v sockets:/tmp clamav/clamav:latest &
 
