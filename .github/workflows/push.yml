@@ -45,8 +45,8 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - id: lower-repo
-        name: Repository to lowercase
+      - id: repo-to-lowercase
+        name: Convert repository to lowercase
         run: |
           repo_var=${{ github.repository }}
           echo "repository=${repo_var@L}" >> $GITHUB_OUTPUT
