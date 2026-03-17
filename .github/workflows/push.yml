@@ -12,7 +12,7 @@ jobs:
       branch: ${{ steps.extract_branch_meta.outputs.branch }}
       sha: ${{ steps.extract_branch_meta.outputs.sha }}
     steps:
-      - name: Extract branch meta
+      - name: Extract branch metadata
         shell: bash
         id: extract_branch_meta
         env:
