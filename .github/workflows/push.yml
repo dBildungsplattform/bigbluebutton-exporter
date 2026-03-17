@@ -89,7 +89,7 @@ jobs:
         run: |
           mkdir -p ${{ github.workspace }}/clamavscan/container_fs
           chmod -R 777 ${{ github.workspace }}/clamavscan
-          docker create --name temp_scan_container ${{ steps.first-image-tag.outputs.tag }}
+          docker create --name temp_scan_container ${{ steps.extract-first-image-tag.outputs.tag }}
           docker export temp_scan_container | tar -xf - -C ${{ github.workspace }}/clamavscan/container_fs
           docker rm temp_scan_container
 
@@ -132,7 +132,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.35.0
         with:
-          image-ref: ${{ steps.first-image-tag.outputs.tag }}
+          image-ref: ${{ steps.extract-first-image-tag.outputs.tag }}
           format: "sarif"
           output: "trivy-results.sarif"
           severity: "CRITICAL,HIGH"
@@ -151,7 +151,7 @@ jobs:
       - name: Run Trivy vulnerability scanner to generate SBOM
         uses: aquasecurity/trivy-action@0.35.0
         with:
-          image-ref: ${{ steps.first-image-tag.outputs.tag }}
+          image-ref: ${{ steps.extract-first-image-tag.outputs.tag }}
           format: "github"
           output: "dependency-results.sbom.json"
           scan-type: 'image'
