@@ -88,8 +88,8 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: lower-repo
-        name: Repository to lowercase
+      - id: repo-to-lowercase
+        name: Convert repository to lowercase
         run: |
           repo_var=${{ github.repository }}
           echo "repository=${repo_var@L}" >> $GITHUB_OUTPUT
@@ -103,7 +103,7 @@ jobs:
           pull: true
           tags: ${{ steps.docker_meta_img.outputs.tags }}
           labels: ${{ steps.docker_meta_img.outputs.labels }}
-      - name: run trivy vulnerability scanner
+      - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: ghcr.io/${{ steps.lower-repo.outputs.repository }}@${{ steps.docker_build_push.outputs.digest }}
@@ -115,7 +115,7 @@ jobs:
         env:
           TRIVY_SKIP_DB_UPDATE: false
           TRIVY_SKIP_JAVA_DB_UPDATE: false
-      - name: upload trivy results
+      - name: Upload Trivy results
         if: ${{ always() }}
         uses: github/codeql-action/upload-sarif@v3
         with:
