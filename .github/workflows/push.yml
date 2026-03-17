@@ -6,7 +6,7 @@ on:
       - 'release'
 
 jobs:
-  branch_meta:
+  branch_metadata:
     runs-on: ubuntu-latest
     outputs:
       branch: ${{ steps.extract_branch_meta.outputs.branch }}
@@ -33,7 +33,7 @@ jobs:
     name: Publish image
     runs-on: ubuntu-latest
     needs:
-      - branch_meta
+      - branch_metadata
     outputs:
       image_tag: ${{ steps.docker_meta_img_trivy.outputs.tags }}
     permissions:
@@ -85,7 +85,7 @@ jobs:
           tags: ${{ steps.docker_meta_img.outputs.tags }}
           labels: ${{ steps.docker_meta_img.outputs.labels }}
 
-      - name: Export Docker image as tar
+      - name: Export Docker image filesystem
         run: |
           mkdir -p ${{ github.workspace }}/clamavscan/container_fs
           chmod -R 777 ${{ github.workspace }}/clamavscan
@@ -93,24 +93,15 @@ jobs:
           docker export temp_scan_container | tar -xf - -C ${{ github.workspace }}/clamavscan/container_fs
           docker rm temp_scan_container
 
-      - name: Create ClamAV Socket dir
+      - name: Prepare ClamaAV
         run: |
           docker volume create sockets
-
-      - name: create logfile
-        run: |
           touch ${{ github.workspace }}/clamav-results.txt
           chmod ugo+rw ${{ github.workspace }}/clamav-results.txt
-
-      - name: Run ClamAV Update
-        run: |
           docker run --rm -v ${{ github.workspace }}/clamavscan:/scan clamav/clamav:latest freshclam --datadir=/scan
-
-      - name: Run ClamAV start Daemon
-        run: |
           docker run  --rm -v ${{ github.workspace }}/clamavscan:/scan -v sockets:/tmp clamav/clamav:latest &
 
-      - name: Run ClamAV SCAN
+      - name: Run ClamAV scan
         run: |
           docker run --rm -v ${{ github.workspace }}:/workdir -v ${{ github.workspace }}/clamavscan:/scan -v sockets:/tmp clamav/clamav:latest clamdscan /scan/container_fs -m -w --fdpass -l /workdir/clamav-results.txt -v --stdout
 
@@ -138,7 +129,7 @@ jobs:
           done
         timeout-minutes: 10
 
-      - name: run trivy vulnerability scanner
+      - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: ${{ steps.first-image-tag.outputs.tag }}
@@ -151,7 +142,7 @@ jobs:
           TRIVY_SKIP_DB_UPDATE: false
           TRIVY_SKIP_JAVA_DB_UPDATE: true
 
-      - name: upload trivy results
+      - name: Upload Trivy results
         if: ${{ always() }}
         uses: github/codeql-action/upload-sarif@v4
         with:
