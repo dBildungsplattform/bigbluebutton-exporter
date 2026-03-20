@@ -104,7 +104,7 @@ jobs:
           tags: ${{ steps.docker_meta_img.outputs.tags }}
           labels: ${{ steps.docker_meta_img.outputs.labels }}
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: ghcr.io/${{ steps.repo-to-lowercase.outputs.repository }}@${{ steps.docker_build_push.outputs.digest }}
           format: "sarif"
@@ -120,3 +120,11 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: "trivy-results.sarif"
+      - name: trigger gitlab pipeline to backup the image
+        run: |
+          curl --request POST \
+            --form token=${{ secrets.GITLAB_PIPELINE_TRIGGER_TOKEN }} \
+            --form "ref=main" \
+            --form "inputs[image-tag]=${{ needs.get_tag.outputs.tag }}" \
+            --form "inputs[image-name]=ghcr.io/${{ steps.repo-to-lowercase.outputs.repository }}" \
+            "https://git.dataport.de/api/v4/projects/13658/trigger/pipeline"
